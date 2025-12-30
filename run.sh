@@ -1,27 +1,34 @@
 #!/bin/bash
 
-# Set environment variables
-CONTAINER_NAME="measurement_plane_gui_container"
-IMAGE_NAME="amlabdr/measurement_plane_gui:latest"
-BROKER_URL=${BROKER_URL:-"amqp://localhost:5672/"}
+set -e
+
+CONTAINER_NAME="measurement_plane_gui"
+IMAGE_NAME="ghcr.io/measurement-plane/gui:latest"
+
+# Default environment variables
+BROKER_URL="nats://172.17.0.1:4222"
+ORCHESTRATOR_URL="http://172.17.0.1:8080"
+
+echo "Using BROKER_URL=$BROKER_URL"
+echo "Using ORCHESTRATOR_URL=$ORCHESTRATOR_URL"
 
 # Stop and remove any running container with the same name
-docker stop $CONTAINER_NAME >/dev/null 2>&1 || true
-docker rm $CONTAINER_NAME >/dev/null 2>&1 || true
+echo "Stopping and removing existing container (if any)..."
+docker stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+docker rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
-# Attempt to pull the latest image
-echo "Attempting to pull the latest image..."
-if docker pull "$IMAGE_NAME"; then
-    echo "Successfully pulled the latest image."
-else
-    echo "Warning: Failed to pull the image. Using the existing local image, if available."
+# Pull the latest pre-built image
+echo "Pulling the latest image..."
+if ! docker pull "$IMAGE_NAME"; then
+    echo "Error: Failed to pull the image. Exiting."
+    exit 1
 fi
 
-# Run the container
-docker run --name "$CONTAINER_NAME" \
-    -e BROKER_URL="$BROKER_URL" \
+# Run GUI container
+echo "Starting the container..."
+docker run -d \
+    --name "$CONTAINER_NAME" \
     -p 8050:8050 \
-    "$IMAGE_NAME" || {
-    echo "Error: Failed to start the container."
-    exit 1
-}
+    -e BROKER_URL="$BROKER_URL" \
+    -e ORCHESTRATOR_URL="$ORCHESTRATOR_URL" \
+    "$IMAGE_NAME"
